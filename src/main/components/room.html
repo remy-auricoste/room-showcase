@@ -1,3 +1,10 @@
 <div>
-    <div>ici : {{room.name}}</div>
+    <div>vous êtes : {{room.name}}</div>
+    <div>
+        <div>members :</div>
+        <div ng-repeat="member in room.members">{{member}}</div>
+        <div>messages :</div>
+        <div ng-repeat="message in room.messages.array">{{message.user}} > {{message.message}}</div>
+        <input type="text" ng-model="text" ng-keydown="onKeydown($event)"/>
+    </div>
 </div>
