@@ -1,0 +1,22 @@
+.chat .room-menu {
+    padding: 10px;
+    border: solid black 1px;
+    display: table-cell;
+    border-radius: 10px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    cursor: pointer;
+}
+.chat .room-menu:hover {
+    background-color: greenyellow;
+}
+.chat .room-menu.active {
+    background-color: lightgreen;
+    cursor: default;
+}
+.chat .room-menu.add {
+    background-color: white;
+}
+.chat .room-menu.add input {
+    border: none;
+}

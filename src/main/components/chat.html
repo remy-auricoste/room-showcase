@@ -1,0 +1,10 @@
+<div>
+    <div ng-repeat="room in rooms" class="room-menu" ng-class="{active: activeRoom === room}">
+        <div>{{room.name}}</div>
+    </div>
+    <div class="room-menu add" ng-show="isAdding" ng-cloak>
+        <input type="text" ng-model="newRoomName"/>
+    </div>
+    <div class="room-menu" ng-click="prepareAdd()">+</div>
+</div>
+<div d-room room="activeRoom"></div>

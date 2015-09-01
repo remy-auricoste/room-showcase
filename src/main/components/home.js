@@ -1,2 +1,1 @@
-/* import title */ var title = require('./title');
-/* import adder */ var adder = require('./adder');
+/* import chat */ var chat = require('./chat');

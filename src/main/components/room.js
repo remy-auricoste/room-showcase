@@ -1,8 +1,8 @@
-/* import filename */ var filename = 'title';
+/* import filename */ var filename = 'room';
 /* import directives */ var directives = require('./../js/directives');
 
 directives.addTemplate(filename, {
-    title: "@"
+    room: "="
 }, function($scope) {
-    $scope.subtitle = "mon sous-titre";
+
 });
