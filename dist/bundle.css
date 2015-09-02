@@ -1,0 +1,154 @@
+
+.chat .room-menu {
+    padding: 10px;
+    border: solid black 1px;
+    display: table-cell;
+    border-radius: 10px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    cursor: pointer;
+}
+.chat .room-menu:hover {
+    background-color: greenyellow;
+}
+.chat .room-menu.active {
+    background-color: lightgreen;
+    cursor: default;
+}
+.chat .room-menu.add {
+    background-color: white;
+}
+.chat .room-menu.add input {
+    border: none;
+}
+.room {
+    font-size: 18px;
+}
+.room .users {
+    padding: 5px;
+    background-color: lightgrey;
+    color: white;
+}
+.room .user {
+    text-align: right;
+    width: 100%;
+    cursor: pointer;
+}
+.room .user.over {
+    color: yellow;
+}
+.room .messages {
+    padding: 5px;
+    background-color: lightgreen;
+}
+.room .message {
+}
+.room .message.command {
+    color: grey;
+    font-style: italic;
+}
+.room input {
+    width: 99%;
+    height: 1.5em;
+}
+.room .members {
+    padding: 5px;
+    background-color: lightgrey;
+}
+.room .member {
+    cursor: pointer;
+}
+.room .member:hover {
+    color: grey;
+}
+.room .members > div, .room .users > div, .room .messages > div {
+    height: 24px;
+}
+p, div, body {
+    height: auto;
+    clear: both;
+    margin: 0px;
+    padding: 0px;
+
+}
+img {
+    display: block;
+}
+
+.columns > div {
+    float: left;
+    clear: none;
+}
+.small-1 {
+    width: 8.33%;
+}
+.small-2 {
+    width: 16.66%;
+}
+.small-3 {
+    width: 25%;
+}
+.small-4 {
+    width: 33.33%;
+}
+.small-5 {
+    width: 41.66%;
+}
+.small-6 {
+    width: 50%;
+}
+.small-7 {
+    width: 58.33%;
+}
+.small-8 {
+    width: 66.66%;
+}
+.small-9 {
+    width: 75%;
+}
+.small-10 {
+    width: 83.33%;
+}
+.small-11 {
+    width: 91.66%;
+}
+.small-12 {
+    width: 100%;
+}
+.spacer {
+    height: 1rem;
+}
+.left {
+    float: left;
+}
+.right {
+    float: right;
+}
+.animated {
+    transition: 0.5s;
+}
+.rotated {
+    transform: rotate(90deg);
+}
+
+.center {
+    width: 100%;
+    text-align: center;
+}
+.center > div {
+    display: inline-block;
+    text-align: left;
+}
+img.center {
+    display: block;
+    margin: 0 auto;
+}
+.hide {
+    display: none;
+}
+div, body, html, p {
+    height: 100%;
+}
+.normal-height {
+    height: auto;
+}
