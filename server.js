@@ -1,7 +1,7 @@
 var static = require('node-static');
 var SocketServer = require("rauricoste-websocket-room-server");
 
-var port = process.env.port || 8000;
+var port = process.env.PORT || 8000;
 
 var fileServer = new static.Server('.', {
     cache: 1
