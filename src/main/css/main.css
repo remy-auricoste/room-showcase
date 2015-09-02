@@ -1,0 +1,6 @@
+div, body, html, p {
+    height: 100%;
+}
+.normal-height {
+    height: auto;
+}
