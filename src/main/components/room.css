@@ -9,6 +9,10 @@
 .room .user {
     text-align: right;
     width: 100%;
+    cursor: pointer;
+}
+.room .user.over {
+    color: yellow;
 }
 .room .messages {
     padding: 5px;
@@ -27,6 +31,12 @@
 .room .members {
     padding: 5px;
     background-color: lightgrey;
+}
+.room .member {
+    cursor: pointer;
+}
+.room .member:hover {
+    color: grey;
 }
 .room .members > div, .room .users > div, .room .messages > div {
     height: 24px;
