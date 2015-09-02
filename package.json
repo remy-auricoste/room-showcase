@@ -10,11 +10,11 @@
   "author": "remy.auricoste@gmail.com",
   "license": "ISC",
   "devDependencies": {
-    "node-static": "^0.7.6",
-    "q": "^1.4.1",
     "rauricoste-node-tests": "x"
   },
   "dependencies": {
+    "q": "^1.4.1",
+    "node-static": "^0.7.6",
     "angular": "^1.3.16",
     "angular-route": "^1.3.16",
     "rauricoste-meta": "0.0.11",
