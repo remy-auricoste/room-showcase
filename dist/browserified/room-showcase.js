@@ -33117,7 +33117,7 @@ Socket.prototype.send = function(message) {
     if (!this.connected) {
         throw new Error("not connected !");
     }
-    this.wrapped.send(message);
+    return this.wrapped.send(message);
 }
 module.exports = Socket;
 
@@ -33125,6 +33125,15 @@ module.exports = Socket;
 /* import Socket */ var Socket = require("./Socket");
 /* import XhrSocket */ var XhrSocket = require("./XhrSocket");
 var Q = require("./Q");
+
+var cron = function(interval, fonction) {
+    setTimeout(function() {
+        var result = fonction();
+        if (result) {
+            cron(interval, fonction);
+        }
+    }, interval);
+}
 
 var SocketBus = function(host, onReceive, onRoomChange) {
     // object compatibility
@@ -33202,6 +33211,12 @@ var SocketBus = function(host, onReceive, onRoomChange) {
         }
     });
     this.connectPromise = defer.promise;
+    this.connectPromise.then(function() {
+        cron(40000, function() {
+            self.sendCommand("PING");
+            return self.connected;
+        });
+    });
 }
 SocketBus.prototype.sendObject = function(object) {
     var self = this;
@@ -33211,25 +33226,25 @@ SocketBus.prototype.sendObject = function(object) {
     });
 }
 SocketBus.prototype.send = function(dest, message) {
-    this.sendObject({
+    return this.sendObject({
         dest: dest,
         message: message
     });
 }
 SocketBus.prototype.sendCommand = function(command, args) {
-    this.sendObject({
+    return this.sendObject({
         server: command,
         args: args
     });
 }
 SocketBus.prototype.joinRoom = function(roomName) {
-    this.sendCommand("JOIN", [roomName]);
+    return this.sendCommand("JOIN", [roomName]);
 }
 SocketBus.prototype.leaveRoom = function(roomName) {
-    this.sendCommand("LEAVE", [roomName]);
+    return this.sendCommand("LEAVE", [roomName]);
 }
 SocketBus.prototype.sendRoom = function(roomName, message) {
-    this.sendObject({
+    return this.sendObject({
         room: roomName,
         message: message
     });
