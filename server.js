@@ -1,5 +1,5 @@
 var static = require('node-static');
-var SocketServer = require("rauricoste-websocket-room-server");
+var Server = require("rauricoste-websocket-room-server");
 
 var port = process.env.PORT || 8000;
 
@@ -24,4 +24,4 @@ require('http').createServer(function (request, response) {
     }).resume();
 }).listen(port);
 
-//new SocketServer(8001);
+//new Server.XhrServer(8001);

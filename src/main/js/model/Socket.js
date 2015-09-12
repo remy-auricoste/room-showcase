@@ -5,7 +5,7 @@ var SocketBus = require("rauricoste-websocket-room-client");
 var rooms = Room.all;
 
 var socket = new SocketBus({
-    url: "ws://websocket-room.herokuapp.com:8001/",
+    host: ["websocket-room-ws.herokuapp.com", "websocket-room-http.herokuapp.com"],
     onReceive: function(messageObj) {
         if (messageObj.room) {
             var room = rooms[messageObj.room];
