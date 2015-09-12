@@ -1,4 +1,4 @@
-/* import myApp */ var myApp = require('./myApp');
+/* import app */ var app = require('./app');
 /* import AngularInjects */ var AngularInjects = require('./AngularInjects');
 
 'use strict';
@@ -10,7 +10,7 @@ var firstCapital = function(string) {
 var object = {
     addTemplate: function(name, params, linkFct) {
         var directiveName = "d"+firstCapital(name);
-        myApp.directive(directiveName, ['$document', '$timeout', function($document, $timeout) {
+        app.directive(directiveName, ['$document', '$timeout', function($document, $timeout) {
             if (!AngularInjects.$document) {
                 AngularInjects.$document = $document;
             }
