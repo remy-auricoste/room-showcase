@@ -33376,7 +33376,6 @@ directives.addTemplate(filename, {
     var addRoom = function(room) {
         $scope.rooms.push(room);
         $scope.selectRoom(room);
-        console.log("added room", room);
     }
     $scope.add = function() {
         $scope.isAdding = false;
@@ -33555,6 +33554,8 @@ var PrivateRoom = function(dest, socket) {
     this.messages.push({message: "Vous avez rejoint la discussion privée avec "+dest});
 }
 PrivateRoom.prototype.send = function(message) {
+    var self = this;
+    this.messages.push({user: self.socket.id, message: message});
     this.socket.send(this.dest, message);
 }
 
@@ -33592,7 +33593,7 @@ var socket = new SocketBus({
         } else if (messageObj.dest === socket.id) {
             AngularInjects.$rootScope.$emit("privateMessage", {user: messageObj.source, message: messageObj.message, room: messageObj.source});
         } else {
-            console.log("received unprocessed message", messageObj);
+            console.error("received unprocessed message", messageObj);
         }
     },
     onRoomChange: function(roomChange) {

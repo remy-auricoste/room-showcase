@@ -11,6 +11,8 @@ var PrivateRoom = function(dest, socket) {
     this.messages.push({message: "Vous avez rejoint la discussion privée avec "+dest});
 }
 PrivateRoom.prototype.send = function(message) {
+    var self = this;
+    this.messages.push({user: self.socket.id, message: message});
     this.socket.send(this.dest, message);
 }
 
