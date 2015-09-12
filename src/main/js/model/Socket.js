@@ -8,12 +8,11 @@ var socket = new SocketBus({
     host: ["websocket-room-ws.herokuapp.com", "websocket-room-http.herokuapp.com"],
     onReceive: function(messageObj) {
         if (messageObj.room) {
-            var room = rooms[messageObj.room];
-            if (room) {
-                AngularInjects.$timeout(function() {
-                    room.messages.push({user: messageObj.source, message: messageObj.message});
-                }, 0);
-            }
+            AngularInjects.$rootScope.$emit("roomMessage", {user: messageObj.source, message: messageObj.message, room: messageObj.room});
+        } else if (messageObj.dest === socket.id) {
+            AngularInjects.$rootScope.$emit("privateMessage", {user: messageObj.source, message: messageObj.message, room: messageObj.source});
+        } else {
+            console.error("received unprocessed message", messageObj);
         }
     },
     onRoomChange: function(roomChange) {

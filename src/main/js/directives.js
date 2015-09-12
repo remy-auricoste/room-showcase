@@ -10,12 +10,20 @@ var firstCapital = function(string) {
 var object = {
     addTemplate: function(name, params, linkFct) {
         var directiveName = "d"+firstCapital(name);
-        app.directive(directiveName, ['$document', '$timeout', function($document, $timeout) {
+        app.directive(directiveName, ['$document'
+                                    , '$timeout'
+                                    , '$location'
+                                    , '$rootScope'
+                                    , function($document
+                                                , $timeout
+                                                , $location
+                                                , $rootScope
+                                                ) {
             if (!AngularInjects.$document) {
                 AngularInjects.$document = $document;
-            }
-            if (!AngularInjects.$timeout) {
                 AngularInjects.$timeout = $timeout;
+                AngularInjects.$location = $location;
+                AngularInjects.$rootScope = $rootScope;
             }
             var result = {
                 scope: params,

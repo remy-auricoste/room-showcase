@@ -1,6 +1,7 @@
 /* import filename */ var filename = 'room';
 /* import directives */ var directives = require('./../js/directives');
 /* import Select */ var Select = require("./../js/tools/Select");
+/* import AngularInjects */ var AngularInjects = require("../js/AngularInjects");
 
 var $ = Select;
 
@@ -33,6 +34,6 @@ directives.addTemplate(filename, {
         textEl.focus();
     }
     $scope.onMemberClick = function(member) {
-        // TODO open private room
+        AngularInjects.$rootScope.$emit("openPrivateRoom", member);
     }
 });
