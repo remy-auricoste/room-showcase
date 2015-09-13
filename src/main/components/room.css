@@ -41,3 +41,9 @@
 .room .members > div, .room .users > div, .room .messages > div {
     height: 24px;
 }
+.room .videos-container {
+    height: 80%;
+}
+.room .videos-container video {
+    height: 100%;
+}

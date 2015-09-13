@@ -1,4 +1,8 @@
-<div class="columns">
+<div class="videos-container hide">
+    <video class="inStream" crossorigin="anonymous" autoplay></video>
+    <video class="outStream" crossorigin="anonymous" autoplay></video>
+</div>
+<div class="columns room-container">
     <div class="small-3">
         <div class="users">
             <div ng-repeat="message in room.messages.array"
@@ -25,8 +29,6 @@
                     >{{member}}</div>
             <div ng-if="room.private">
                 <input type="button" value="Start camera" ng-click="sendStream()"/>
-                <video class="outStream" crossorigin="anonymous" autoplay></video>
-                <video class="inStream" crossorigin="anonymous" autoplay></video>
             </div>
         </div>
     </div>
