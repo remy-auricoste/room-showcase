@@ -11,9 +11,13 @@ var PrivateRoom = function(dest, socket) {
     this.private = true;
     Room.all[dest] = this;
     this.socket = socket;
-    this.rtc = new RtcSocket(socket, function(streamUrl) {
+    var showVideos = function() {
+        $(self.element).find(".videos-container")[0].style.display = "inline-block";
+    }
+
+    this.rtc = new RtcSocket(socket, function(socket) {}, function(streamUrl) {
         $(self.element).find(".inStream")[0].src = streamUrl;
-        $(self.element).find(".videos-container")[0].style.display = "block";
+        showVideos();
     });
     this.dest = dest;
     this.name = dest.substring(0, 6)+"...";
@@ -27,9 +31,9 @@ PrivateRoom.prototype.send = function(message) {
 }
 PrivateRoom.prototype.sendStream = function() {
     var self = this;
-    this.rtc.connect(this.dest, { "audio": false, "video": true }).then(function(streamUrl) {
+    this.rtc.sendStream(this.dest, { "audio": false, "video": true }).then(function(streamUrl) {
         $(self.element).find(".outStream")[0].src = streamUrl;
-        $(self.element).find(".videos-container")[0].style.display = "block";
+        showVideos();
     });
 }
 
