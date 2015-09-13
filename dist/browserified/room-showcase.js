@@ -31740,7 +31740,7 @@ return Q;
 });
 
 }).call(this,require('_process'))
-},{"_process":44}],6:[function(require,module,exports){
+},{"_process":46}],6:[function(require,module,exports){
 var Collections = {
     foreach: function(object, fonction) {
         if (object instanceof Array) {
@@ -32173,6 +32173,94 @@ var boxFct = function() {
 module.exports = Wrapper;
 
 },{"./Collections":6}],9:[function(require,module,exports){
+
+var readableAlphabet = "abcdefghjkmnopqrstuvwxyz0987654321";
+module.exports = {
+    nextNumber: function(min, max) {
+        return Math.random() * (max - min) + min;
+    },
+    nextInt: function(min, max /* inclusives */) {
+        return Math.floor(this.nextNumber(min, max + 1));
+    },
+    nextChar: function(alphabet) {
+        return alphabet.charAt(this.nextInt(0, alphabet.length - 1));
+    },
+    nextString: function(alphabet, length) {
+        if (length === undefined) {
+            length = 32;
+        }
+        var result = "";
+        for (var i=0;i<length;i++) {
+            result += this.nextChar(alphabet);
+        }
+        return result;
+    },
+    nextReadableId: function(length) {
+        return this.nextString(readableAlphabet, length);
+    }
+}
+},{}],10:[function(require,module,exports){
+var Random = require("rauricoste-random");
+var StreamChannel = require("./StreamChannel");
+
+var DataChannel = function(socket, dest) {
+    var self = this;
+    this.dest = dest;
+    this.socket = socket;
+    this.type = "data";
+    this.listeners = {};
+    this.listener = socket.addListener(function(message) {
+        if (message.message.dataChannel) {
+            for (var key in self.listeners) {
+                var listener = self.listeners[key];
+                listener(message.message.dataChannel.message);
+            }
+        }
+    });
+    this.inStream = new StreamChannel(this, true);
+    this.outStream = new StreamChannel(this, false);
+}
+DataChannel.prototype.send = function(message) {
+    var self = this;
+    return this.socket.send(this.dest, {dataChannel: {message: message}});
+}
+DataChannel.prototype.addListener = function(listener) {
+    var self = this;
+    if (typeof listener === "function") {
+        var id = Random.nextReadableId();
+        self.listeners[id] = listener;
+        return {
+            delete: function() {
+                delete self.listeners[id];
+            }
+        }
+    }
+}
+DataChannel.prototype.close = function() {
+    this.listener.delete();
+}
+module.exports = DataChannel;
+},{"./StreamChannel":11,"rauricoste-random":9}],11:[function(require,module,exports){
+var StreamChannel = function(channel, isIncoming) {
+    var self = this;
+    this.way = isIncoming ? "<=" : "=>";
+    this.otherWay = !isIncoming ? "<=" : "=>";
+    this.channel = channel;
+    this.listener = channel.addListener(function(message) {
+        if (message.rtc && message.rtc.way === self.otherWay) {
+            self.onMessage(message.rtc.message);
+        }
+    });
+}
+StreamChannel.prototype.send = function(message) {
+    var self = this;
+    return this.channel.send({rtc: {way: self.way, message: message}});
+}
+StreamChannel.prototype.close = function() {
+    this.listener.delete();
+}
+module.exports = StreamChannel;
+},{}],12:[function(require,module,exports){
 var Q = require("q");
 
 var WebRtcSocket = function(channel, transferMode, onStream) {
@@ -32275,116 +32363,60 @@ WebRtcSocket.prototype.onSignal = function(evt) {
 }
 module.exports = WebRtcSocket;
 
-},{"q":5}],10:[function(require,module,exports){
+},{"q":5}],13:[function(require,module,exports){
 var SocketBus = require("rauricoste-websocket-room-client");
-
-var WebSocketChannel = function(socket, dest) {
-    var self = this;
-    this.dest = dest;
-    this.way = dest ? "<=" : "=>";
-    this.otherWay = !dest ? "<=" : "=>";
-    this.socket = socket;
-    this.listener = socket.addListener(function(message) {
-        if (message.message.rtc && message.message.rtc.way === self.otherWay) {
-            self.onMessage(message.message.rtc.message);
-        }
-    });
-}
-WebSocketChannel.prototype.send = function(message) {
-    var self = this;
-    return this.socket.send(this.dest, {rtc: {way: self.way, message: message}});
-}
-WebSocketChannel.prototype.close = function() {
-    this.listener.delete();
-}
-module.exports = WebSocketChannel;
-},{"rauricoste-websocket-room-client":19}],11:[function(require,module,exports){
-var SocketBus = require("rauricoste-websocket-room-client");
-var WebSocketChannel = require("./WebSocketChannel");
 var WebRtcSocket = require("./WebRtcSocket");
-var Q = require("q");
+var DataChannel = require("./DataChannel");
 
-var Commands = {
-    Open: "OPEN",
-    Accept: "ACCEPT",
-    Refuse: "REFUSE",
-    Close: "CLOSE"
-}
-
-var WebSocketListener = function(socket, onStream) {
-    if (typeof onStream !== "function") {
-        throw new Error("onStream param should be a function");
+var WebSocketListener = function(socket, onChannel, onStream) {
+    if (typeof onChannel !== "function") {
+        throw new Error("onChannel param should be a function");
     }
     var self = this;
+    this.onChannel = onChannel;
     this.onStream = onStream;
     this.openChannels = {};
+    this.rtcChannels = {};
     this.socket = socket;
     socket.addListener(function(message) {
-        if (message.message.rtcInit) {
-            var command = message.message.rtcInit;
-            console.log("received "+command+" from  "+message.source);
-            switch(command) {
-                case Commands.Open:
-                    var dest = message.message.id;
-                    var rtcSocket = self.createRtcSocket(dest);
-                    var socket = rtcSocket.channel.socket;
-                    socket.connectPromise.then(function() {
-                        self.socket.send(message.source, {rtcInit: Commands.Accept, localId: socket.id, remoteId: dest});
-                    });
-                    break;
-                case Commands.Accept:
-                    console.log("receive accept", message.message);
-                    var dest = message.message.localId;
-                    var channel = self.openChannels[message.message.remoteId];
-                    channel.dest = dest;
-                    var socket = new WebRtcSocket(channel, channel.transferMode, self.onStream);
-                    socket.start(true).then(function(result) {
-                        channel.defer.resolve(result);
-                    }).catch(function(err) {
-                        channel.defer.reject(err);
-                    }).finally(function() {
-                        channel.close();
-                    });
-                    break;
-                case Commands.Refuse:
-                    break;
-                default:
-                    console.warn("Unsupported command "+command);
-            }
-
+        if (message.message.dataChannel) {
+            var source = message.source;
+            self.getDataChannel(source);
         }
     });
 }
-WebSocketListener.prototype.connect = function(dest, transferMode) {
+WebSocketListener.prototype.sendStream = function(dest, transferMode) {
     if (typeof transferMode !== "object") {
         throw new Error("transferMode should be an object");
     }
     var self = this;
-    var channel = new WebSocketChannel(this.socket, null);
-    var socket = channel.socket;
-    var defer = Q.defer();
-    return socket.connectPromise.then(function() {
-        self.openChannels[socket.id] = channel;
-        channel.defer = defer;
-        channel.promise = defer.promise;
-        channel.transferMode = transferMode;
-        self.socket.send(dest, {rtcInit: Commands.Open, id:socket.id});
-        return defer.promise;
+    var channel = self.getDataChannel(dest).outStream;
+    channel.transferMode = transferMode;
+    var socket = new WebRtcSocket(channel, transferMode, self.onStream);
+    return socket.start(true).finally(function() {
+        channel.close();
     });
 }
-WebSocketListener.prototype.createRtcSocket = function(dest) {
+WebSocketListener.prototype.getDataChannel = function(dest) {
     var self = this;
-    var channel = new WebSocketChannel(this.socket, dest);
-    var rtcSocket = new WebRtcSocket(channel, null, function(streamUrl) {
-        self.onStream(streamUrl);
-        setTimeout(function() {
-            channel.close();
-        }, 0);
-    });
-    return rtcSocket;
+    var channel = self.openChannels[dest];
+    if (!channel) {
+        channel = new DataChannel(self.socket, dest);
+        self.openChannels[dest] = channel;
+        channel.send("INIT");
+        self.onChannel(channel);
+        var inChannel = channel.inStream;
+        new WebRtcSocket(inChannel, null, function(streamUrl) {
+            self.onStream(streamUrl);
+            setTimeout(function() {
+                inChannel.close();
+            }, 0);
+        })
+    }
+    return channel;
 }
 module.exports = WebSocketListener;
-},{"./WebRtcSocket":9,"./WebSocketChannel":10,"q":5,"rauricoste-websocket-room-client":19}],12:[function(require,module,exports){
+},{"./DataChannel":10,"./WebRtcSocket":12,"rauricoste-websocket-room-client":21}],14:[function(require,module,exports){
 /*
  *  Copyright (c) 2014 The WebRTC project authors. All Rights Reserved.
  *
@@ -32925,40 +32957,15 @@ if (typeof module !== 'undefined') {
     };
   });
 }
-},{}],13:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 require("./adapter");
 var WebSocketListener = require("./WebSocketListener");
 
 module.exports = WebSocketListener;
 
-},{"./WebSocketListener":11,"./adapter":12}],14:[function(require,module,exports){
-
-var readableAlphabet = "abcdefghjkmnopqrstuvwxyz0987654321";
-module.exports = {
-    nextNumber: function(min, max) {
-        return Math.random() * (max - min) + min;
-    },
-    nextInt: function(min, max /* inclusives */) {
-        return Math.floor(this.nextNumber(min, max + 1));
-    },
-    nextChar: function(alphabet) {
-        return alphabet.charAt(this.nextInt(0, alphabet.length - 1));
-    },
-    nextString: function(alphabet, length) {
-        if (length === undefined) {
-            length = 32;
-        }
-        var result = "";
-        for (var i=0;i<length;i++) {
-            result += this.nextChar(alphabet);
-        }
-        return result;
-    },
-    nextReadableId: function(length) {
-        return this.nextString(readableAlphabet, length);
-    }
-}
-},{}],15:[function(require,module,exports){
+},{"./WebSocketListener":13,"./adapter":14}],16:[function(require,module,exports){
+arguments[4][9][0].apply(exports,arguments)
+},{"dup":9}],17:[function(require,module,exports){
 var IntervalCall = function(interval, fonction) {
     setTimeout(function() {
         fonction();
@@ -32967,7 +32974,7 @@ var IntervalCall = function(interval, fonction) {
 }
 
 module.exports = IntervalCall;
-},{}],16:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 var Q = require("q");
 
 Q.empty = function() {
@@ -32990,7 +32997,7 @@ Q.traverse = function(array, promiseFactory) {
 }
 
 module.exports = Q;
-},{"q":5}],17:[function(require,module,exports){
+},{"q":5}],19:[function(require,module,exports){
 var http = require('http');
 var https = require('https');
 var urlTools = require('url');
@@ -33124,7 +33131,7 @@ module.exports = {
     },
     buildParams: buildParams
 };
-},{"http":37,"https":41,"q":5,"url":62}],18:[function(require,module,exports){
+},{"http":39,"https":43,"q":5,"url":64}],20:[function(require,module,exports){
 var Q = require("q");
 
 var Socket = function(receiver) {
@@ -33165,7 +33172,7 @@ Socket.prototype.send = function(message) {
 }
 module.exports = Socket;
 
-},{"q":5}],19:[function(require,module,exports){
+},{"q":5}],21:[function(require,module,exports){
 /* import Socket */ var Socket = require("./Socket");
 /* import XhrSocket */ var XhrSocket = require("./XhrSocket");
 var Q = require("./Q");
@@ -33333,7 +33340,7 @@ SocketBus.prototype.addListener = function(listener) {
 }
 module.exports = SocketBus;
 
-},{"./Q":16,"./Socket":18,"./XhrSocket":20,"rauricoste-random":14}],20:[function(require,module,exports){
+},{"./Q":18,"./Socket":20,"./XhrSocket":22,"rauricoste-random":16}],22:[function(require,module,exports){
 var Q = require("q");
 var Request = require("./Request");
 var IntervalCall = require("./IntervalCall");
@@ -33423,7 +33430,7 @@ Socket.prototype.poll = function() {
 }
 module.exports = Socket;
 
-},{"./IntervalCall":15,"./Request":17,"q":5}],21:[function(require,module,exports){
+},{"./IntervalCall":17,"./Request":19,"q":5}],23:[function(require,module,exports){
 /* import filename */ var filename = 'chat';
 /* import directives */ var directives = require('./../js/directives');
 /* import Room */ var Room = require('./../js/model/Room');
@@ -33508,7 +33515,7 @@ directives.addTemplate(filename, {
     });
 });
 
-},{"./../js/AngularInjects":23,"./../js/directives":25,"./../js/model/PrivateRoom":27,"./../js/model/Room":28,"./../js/model/Socket":29,"./../js/tools/Select":31,"./room":22}],22:[function(require,module,exports){
+},{"./../js/AngularInjects":25,"./../js/directives":27,"./../js/model/PrivateRoom":29,"./../js/model/Room":30,"./../js/model/Socket":31,"./../js/tools/Select":33,"./room":24}],24:[function(require,module,exports){
 /* import filename */ var filename = 'room';
 /* import directives */ var directives = require('./../js/directives');
 /* import Select */ var Select = require("./../js/tools/Select");
@@ -33556,11 +33563,11 @@ directives.addTemplate(filename, {
     }
 });
 
-},{"../js/AngularInjects":23,"./../js/directives":25,"./../js/tools/Select":31}],23:[function(require,module,exports){
+},{"../js/AngularInjects":25,"./../js/directives":27,"./../js/tools/Select":33}],25:[function(require,module,exports){
 
 module.exports = {};
 
-},{}],24:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 /* import angular */ var angular = require('angular');
 
 var myApp = angular.module("myApp", [
@@ -33569,7 +33576,7 @@ var myApp = angular.module("myApp", [
 
 module.exports = myApp;
 
-},{"angular":4}],25:[function(require,module,exports){
+},{"angular":4}],27:[function(require,module,exports){
 /* import app */ var app = require('./app');
 /* import AngularInjects */ var AngularInjects = require('./AngularInjects');
 
@@ -33620,7 +33627,7 @@ var object = {
 
 module.exports = object;
 
-},{"./AngularInjects":23,"./app":24}],26:[function(require,module,exports){
+},{"./AngularInjects":25,"./app":26}],28:[function(require,module,exports){
 /* import angular */ var angular = require('angular');
 require('angular-route');
 /* import app */ var app = require("./app");
@@ -33637,7 +33644,7 @@ app.config(['$routeProvider',
       .otherwise({redirectTo: '/home'});
 }]);
 
-},{"../components/chat":21,"./app":24,"angular":4,"angular-route":2}],27:[function(require,module,exports){
+},{"../components/chat":23,"./app":26,"angular":4,"angular-route":2}],29:[function(require,module,exports){
 /* import Fifo */ var Fifo = require("./../tools/Fifo");
 /* import Room */ var Room = require("./Room");
 var RtcSocket = require("rauricoste-webrtc-client");
@@ -33651,9 +33658,13 @@ var PrivateRoom = function(dest, socket) {
     this.private = true;
     Room.all[dest] = this;
     this.socket = socket;
-    this.rtc = new RtcSocket(socket, function(streamUrl) {
+    var showVideos = function() {
+        $(self.element).find(".videos-container")[0].style.display = "inline-block";
+    }
+
+    this.rtc = new RtcSocket(socket, function(socket) {}, function(streamUrl) {
         $(self.element).find(".inStream")[0].src = streamUrl;
-        $(self.element).find(".videos-container")[0].style.display = "block";
+        showVideos();
     });
     this.dest = dest;
     this.name = dest.substring(0, 6)+"...";
@@ -33667,14 +33678,14 @@ PrivateRoom.prototype.send = function(message) {
 }
 PrivateRoom.prototype.sendStream = function() {
     var self = this;
-    this.rtc.connect(this.dest, { "audio": false, "video": true }).then(function(streamUrl) {
+    this.rtc.sendStream(this.dest, { "audio": false, "video": true }).then(function(streamUrl) {
         $(self.element).find(".outStream")[0].src = streamUrl;
-        $(self.element).find(".videos-container")[0].style.display = "block";
+        showVideos();
     });
 }
 
 module.exports = PrivateRoom;
-},{"../AngularInjects":23,"../tools/Select":31,"./../tools/Fifo":30,"./Room":28,"rauricoste-webrtc-client":13}],28:[function(require,module,exports){
+},{"../AngularInjects":25,"../tools/Select":33,"./../tools/Fifo":32,"./Room":30,"rauricoste-webrtc-client":15}],30:[function(require,module,exports){
 /* import Fifo */ var Fifo = require("./../tools/Fifo");
 
 var Room = function(name, socket) {
@@ -33692,7 +33703,7 @@ Room.prototype.send = function(message) {
 Room.all = {};
 
 module.exports = Room;
-},{"./../tools/Fifo":30}],29:[function(require,module,exports){
+},{"./../tools/Fifo":32}],31:[function(require,module,exports){
 var SocketBus = require("rauricoste-websocket-room-client");
 /* import AngularInjects */ var AngularInjects = require("./../AngularInjects");
 /* import Room */ var Room = require("./Room");
@@ -33721,7 +33732,7 @@ var socket = new SocketBus({
     }
 });
 module.exports = socket;
-},{"./../AngularInjects":23,"./Room":28,"rauricoste-websocket-room-client":19}],30:[function(require,module,exports){
+},{"./../AngularInjects":25,"./Room":30,"rauricoste-websocket-room-client":21}],32:[function(require,module,exports){
 var Fifo = function(size) {
     this.size = size;
     this.array = [];
@@ -33733,7 +33744,7 @@ Fifo.prototype.push = function(element) {
     }
 }
 module.exports = Fifo;
-},{}],31:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 var Meta = require("rauricoste-meta");
 
 var ensureArray = function(object) {
@@ -33796,7 +33807,7 @@ var Select = function(query, elements) {
 
 
 module.exports = Select;
-},{"rauricoste-meta":7}],32:[function(require,module,exports){
+},{"rauricoste-meta":7}],34:[function(require,module,exports){
 /*!
  * The buffer module from node.js, for the browser.
  *
@@ -35114,7 +35125,7 @@ function decodeUtf8Char (str) {
   }
 }
 
-},{"base64-js":33,"ieee754":34,"is-array":35}],33:[function(require,module,exports){
+},{"base64-js":35,"ieee754":36,"is-array":37}],35:[function(require,module,exports){
 var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 ;(function (exports) {
@@ -35240,7 +35251,7 @@ var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 	exports.fromByteArray = uint8ToBase64
 }(typeof exports === 'undefined' ? (this.base64js = {}) : exports))
 
-},{}],34:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 exports.read = function(buffer, offset, isLE, mLen, nBytes) {
   var e, m,
       eLen = nBytes * 8 - mLen - 1,
@@ -35326,7 +35337,7 @@ exports.write = function(buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128;
 };
 
-},{}],35:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 
 /**
  * isArray
@@ -35361,7 +35372,7 @@ module.exports = isArray || function (val) {
   return !! val && '[object Array]' == str.call(val);
 };
 
-},{}],36:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -35664,7 +35675,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],37:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 var http = module.exports;
 var EventEmitter = require('events').EventEmitter;
 var Request = require('./lib/request');
@@ -35810,7 +35821,7 @@ http.STATUS_CODES = {
     510 : 'Not Extended',               // RFC 2774
     511 : 'Network Authentication Required' // RFC 6585
 };
-},{"./lib/request":38,"events":36,"url":62}],38:[function(require,module,exports){
+},{"./lib/request":40,"events":38,"url":64}],40:[function(require,module,exports){
 var Stream = require('stream');
 var Response = require('./response');
 var Base64 = require('Base64');
@@ -36021,7 +36032,7 @@ var isXHR2Compatible = function (obj) {
     if (typeof FormData !== 'undefined' && obj instanceof FormData) return true;
 };
 
-},{"./response":39,"Base64":40,"inherits":42,"stream":60}],39:[function(require,module,exports){
+},{"./response":41,"Base64":42,"inherits":44,"stream":62}],41:[function(require,module,exports){
 var Stream = require('stream');
 var util = require('util');
 
@@ -36143,7 +36154,7 @@ var isArray = Array.isArray || function (xs) {
     return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{"stream":60,"util":64}],40:[function(require,module,exports){
+},{"stream":62,"util":66}],42:[function(require,module,exports){
 ;(function () {
 
   var object = typeof exports != 'undefined' ? exports : this; // #8: web workers
@@ -36205,7 +36216,7 @@ var isArray = Array.isArray || function (xs) {
 
 }());
 
-},{}],41:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 var http = require('http');
 
 var https = module.exports;
@@ -36220,7 +36231,7 @@ https.request = function (params, cb) {
     return http.request.call(this, params, cb);
 }
 
-},{"http":37}],42:[function(require,module,exports){
+},{"http":39}],44:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -36245,12 +36256,12 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],43:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 module.exports = Array.isArray || function (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]';
 };
 
-},{}],44:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -36309,7 +36320,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],45:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 (function (global){
 /*! http://mths.be/punycode v1.2.4 by @mathias */
 ;(function(root) {
@@ -36820,7 +36831,7 @@ process.umask = function() { return 0; };
 }(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],46:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -36906,7 +36917,7 @@ var isArray = Array.isArray || function (xs) {
   return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{}],47:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -36993,16 +37004,16 @@ var objectKeys = Object.keys || function (obj) {
   return res;
 };
 
-},{}],48:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 'use strict';
 
 exports.decode = exports.parse = require('./decode');
 exports.encode = exports.stringify = require('./encode');
 
-},{"./decode":46,"./encode":47}],49:[function(require,module,exports){
+},{"./decode":48,"./encode":49}],51:[function(require,module,exports){
 module.exports = require("./lib/_stream_duplex.js")
 
-},{"./lib/_stream_duplex.js":50}],50:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":52}],52:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -37095,7 +37106,7 @@ function forEach (xs, f) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_readable":52,"./_stream_writable":54,"_process":44,"core-util-is":55,"inherits":42}],51:[function(require,module,exports){
+},{"./_stream_readable":54,"./_stream_writable":56,"_process":46,"core-util-is":57,"inherits":44}],53:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -37143,7 +37154,7 @@ PassThrough.prototype._transform = function(chunk, encoding, cb) {
   cb(null, chunk);
 };
 
-},{"./_stream_transform":53,"core-util-is":55,"inherits":42}],52:[function(require,module,exports){
+},{"./_stream_transform":55,"core-util-is":57,"inherits":44}],54:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -38129,7 +38140,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"_process":44,"buffer":32,"core-util-is":55,"events":36,"inherits":42,"isarray":43,"stream":60,"string_decoder/":61}],53:[function(require,module,exports){
+},{"_process":46,"buffer":34,"core-util-is":57,"events":38,"inherits":44,"isarray":45,"stream":62,"string_decoder/":63}],55:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -38341,7 +38352,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":50,"core-util-is":55,"inherits":42}],54:[function(require,module,exports){
+},{"./_stream_duplex":52,"core-util-is":57,"inherits":44}],56:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -38731,7 +38742,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":50,"_process":44,"buffer":32,"core-util-is":55,"inherits":42,"stream":60}],55:[function(require,module,exports){
+},{"./_stream_duplex":52,"_process":46,"buffer":34,"core-util-is":57,"inherits":44,"stream":62}],57:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -38841,10 +38852,10 @@ function objectToString(o) {
   return Object.prototype.toString.call(o);
 }
 }).call(this,require("buffer").Buffer)
-},{"buffer":32}],56:[function(require,module,exports){
+},{"buffer":34}],58:[function(require,module,exports){
 module.exports = require("./lib/_stream_passthrough.js")
 
-},{"./lib/_stream_passthrough.js":51}],57:[function(require,module,exports){
+},{"./lib/_stream_passthrough.js":53}],59:[function(require,module,exports){
 var Stream = require('stream'); // hack to fix a circular dependency issue when used with browserify
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = Stream;
@@ -38854,13 +38865,13 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":50,"./lib/_stream_passthrough.js":51,"./lib/_stream_readable.js":52,"./lib/_stream_transform.js":53,"./lib/_stream_writable.js":54,"stream":60}],58:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":52,"./lib/_stream_passthrough.js":53,"./lib/_stream_readable.js":54,"./lib/_stream_transform.js":55,"./lib/_stream_writable.js":56,"stream":62}],60:[function(require,module,exports){
 module.exports = require("./lib/_stream_transform.js")
 
-},{"./lib/_stream_transform.js":53}],59:[function(require,module,exports){
+},{"./lib/_stream_transform.js":55}],61:[function(require,module,exports){
 module.exports = require("./lib/_stream_writable.js")
 
-},{"./lib/_stream_writable.js":54}],60:[function(require,module,exports){
+},{"./lib/_stream_writable.js":56}],62:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -38989,7 +39000,7 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
-},{"events":36,"inherits":42,"readable-stream/duplex.js":49,"readable-stream/passthrough.js":56,"readable-stream/readable.js":57,"readable-stream/transform.js":58,"readable-stream/writable.js":59}],61:[function(require,module,exports){
+},{"events":38,"inherits":44,"readable-stream/duplex.js":51,"readable-stream/passthrough.js":58,"readable-stream/readable.js":59,"readable-stream/transform.js":60,"readable-stream/writable.js":61}],63:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -39212,7 +39223,7 @@ function base64DetectIncompleteChar(buffer) {
   this.charLength = this.charReceived ? 3 : 0;
 }
 
-},{"buffer":32}],62:[function(require,module,exports){
+},{"buffer":34}],64:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -39921,14 +39932,14 @@ function isNullOrUndefined(arg) {
   return  arg == null;
 }
 
-},{"punycode":45,"querystring":48}],63:[function(require,module,exports){
+},{"punycode":47,"querystring":50}],65:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],64:[function(require,module,exports){
+},{}],66:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -40518,5 +40529,5 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":63,"_process":44,"inherits":42}]},{},[26])(26)
+},{"./support/isBuffer":65,"_process":46,"inherits":44}]},{},[28])(28)
 });
