@@ -23,6 +23,11 @@
                  class="member"
                  ng-click="onMemberClick(member)"
                     >{{member}}</div>
+            <div ng-if="room.private">
+                <input type="button" value="Start camera" ng-click="sendStream()"/>
+                <video class="outStream" crossorigin="anonymous" autoplay></video>
+                <video class="inStream" crossorigin="anonymous" autoplay></video>
+            </div>
         </div>
     </div>
 </div>

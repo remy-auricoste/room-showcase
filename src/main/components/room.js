@@ -12,6 +12,10 @@ directives.addTemplate(filename, {
     room: "="
 }, function($scope, elements) {
     var el = elements[0];
+    if ($scope.room.private) {
+        $scope.room.element = el;
+    }
+
     var textEl = $(el).find(".text")[0];
     textEl.focus();
     $scope.text = "";
@@ -35,5 +39,8 @@ directives.addTemplate(filename, {
     }
     $scope.onMemberClick = function(member) {
         AngularInjects.$rootScope.$emit("openPrivateRoom", member);
+    }
+    $scope.sendStream = function() {
+        $scope.room.sendStream();
     }
 });

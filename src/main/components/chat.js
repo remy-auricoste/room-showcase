@@ -53,6 +53,9 @@ directives.addTemplate(filename, {
     }
     $scope.selectRoom = function(room) {
         $scope.activeRoom = room;
+        if (room.private) {
+            room.element = $(el).find(".room")[0];
+        }
     }
     AngularInjects.$rootScope.$on("openPrivateRoom", function(event, dest) {
         var privateRoom = new PrivateRoom(dest, socket);
@@ -66,7 +69,9 @@ directives.addTemplate(filename, {
                 room = new roomFactory(roomId, socket);
                 $scope.rooms.push(room);
             }
-            room.messages.push(messageObj);
+            if (typeof messageObj.message === "string") {
+                room.messages.push(messageObj);
+            }
         }, 0);
     }
     AngularInjects.$rootScope.$on("privateMessage", function(event, messageObj) {
